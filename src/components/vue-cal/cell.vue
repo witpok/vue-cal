@@ -12,6 +12,7 @@
                        @mouseenter="onMouseEnter($event, event)"
                        @mouseleave="onMouseLeave($event, event)"
                        @mousedown="onMouseDown($event, event)"
+                       @mousemove="onMouseMove($event, event)"
                        @contextmenu="onContextMenu($event, event)"
                        @touchstart="onTouchStart($event, event)")
           .vuecal__event-delete(v-if="editableEvents"
@@ -102,6 +103,7 @@ export default {
       let simultaneous = Object.keys(event.simultaneous).length + 1
       let forceLeft = false
       let deletable = this.domEvents.clickHoldAnEvent.eventId &&
+                      this.domEvents.dragAnEvent.eventId !== event.id &&
                       (this.domEvents.clickHoldAnEvent.eventId === event.id ||
                       event.linked.find(e => e.id === this.domEvents.clickHoldAnEvent.eventId))
 
@@ -123,9 +125,15 @@ export default {
         }
       }
 
+      if (this.domEvents.dragAnEvent.eventId) {
+        console.log('from style', this.domEvents.dragAnEvent.eventId)
+        // debugger
+      }
+
       return {
         ...event.classes,
         'vuecal__event--focus': this.domEvents.focusAnEvent.eventId === event.id,
+        'vuecal__event--dragging': this.domEvents.dragAnEvent.eventId === event.id,
         'vuecal__event--deletable': deletable,
         'vuecal__event--overlapped': overlapped,
         'vuecal__event--overlapping': overlapping,
@@ -268,11 +276,20 @@ export default {
       }
     },
 
+    getPosition (e) {
+      const rect = e.target.getBoundingClientRect()
+      const { clientX, clientY } = 'ontouchstart' in window && e.touches ? e.touches[0] : e
+      return { x: clientX - rect.left, y: clientY - rect.top }
+    },
+
     // On an event.
     onMouseDown (e, event, touch = false) {
       // Prevent a double mouse down on touch devices.
       if ('ontouchstart' in window && !touch) return false
-      let { clickHoldAnEvent, resizeAnEvent } = this.domEvents
+
+      let { clickHoldAnEvent, resizeAnEvent, dragAnEvent, mousedown } = this.domEvents
+
+      this.domEvents.mousedown = true
 
       // If the delete button is already out and event is on focus then delete event.
       if (this.domEvents.focusAnEvent.eventId === event.id && clickHoldAnEvent.eventId === event.id) {
@@ -283,12 +300,43 @@ export default {
       this.focusEvent(event)
 
       clickHoldAnEvent.eventId = null // Reinit click hold on each click.
+      dragAnEvent.eventId = null // Reinit event dragging on each click.
 
-      // Don't show delete button if dragging event.
-      if (!resizeAnEvent.start && this.editableEvents) {
+      // Don't show delete button if dragging or resizing event.
+      if (!resizeAnEvent.start && !dragAnEvent.eventId && this.editableEvents) {
         clickHoldAnEvent.timeoutId = setTimeout(() => {
           clickHoldAnEvent.eventId = event.id
         }, clickHoldAnEvent.timeout)
+      }
+    },
+
+    // On an event.
+    // @todo: to all this in the parent mousemove function (on document not event).
+    onMouseMove (e, event, touch = false) {
+      // Prevent a double mouse down on touch devices.
+      if ('ontouchstart' in window && !touch) return false
+
+      if (this.domEvents.mousedown) {
+        let {
+          focusAnEvent,
+          resizeAnEvent,
+          dragAnEvent,
+          clickHoldAnEvent,
+          dragging
+        } = this.domEvents
+
+        this.domEvents.dragging = true
+
+        // Do something on event drag.
+        if (focusAnEvent.eventId) {
+          if (!dragAnEvent.eventId) dragAnEvent.eventId = focusAnEvent.eventId
+
+          // Cancel delete button on drag.
+          else clickHoldAnEvent.eventId = null
+
+          event.top = this.getPosition(e).y
+          console.log(event.top)
+        }
       }
     },
 
@@ -313,7 +361,11 @@ export default {
 
     onDragHandleMouseDown (e, event) {
       const start = 'ontouchstart' in window && e.touches ? e.touches[0].clientY : e.clientY
-      this.domEvents.resizeAnEvent = Object.assign(this.domEvents.resizeAnEvent, {
+      let { resizeAnEvent, mousedown } = this.domEvents
+
+      this.domEvents.mousedown = true
+
+      resizeAnEvent = Object.assign(resizeAnEvent, {
         start,
         originalHeight: event.height,
         newHeight: event.height,

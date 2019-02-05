@@ -173,6 +173,8 @@ export default {
     },
     eventIdIncrement: 1,
     domEvents: {
+      mousedown: false,
+      dragging: false,
       resizeAnEvent: {
         eventId: null, // Only one at a time.
         start: null,
@@ -180,7 +182,8 @@ export default {
         newHeight: 0
       },
       dragAnEvent: {
-        eventId: null // Only one at a time.
+        eventId: null, // Only one at a time.
+        start: null
       },
       focusAnEvent: {
         eventId: null // Only one at a time.
@@ -355,16 +358,26 @@ export default {
     // Event resizing is started in cell component (onMouseDown) but place onMouseMove & onMouseUp
     // handlers in the single parent for performance.
     onMouseMove (e) {
-      let { resizeAnEvent } = this.domEvents
-      if (resizeAnEvent.eventId === null) return
+      let { resizeAnEvent, mousedown, dragging } = this.domEvents
 
-      e.preventDefault()
-      const y = 'ontouchstart' in window ? e.touches[0].clientY : e.clientY
-      resizeAnEvent.newHeight = resizeAnEvent.originalHeight + (y - resizeAnEvent.start)
+      if (mousedown) {
+        e.preventDefault()
+        this.domEvents.dragging = true
+
+        const y = 'ontouchstart' in window ? e.touches[0].clientY : e.clientY
+        resizeAnEvent.newHeight = resizeAnEvent.originalHeight + (y - resizeAnEvent.start)
+      }
     },
 
     onMouseUp (e) {
-      let { focusAnEvent, resizeAnEvent, clickHoldAnEvent } = this.domEvents
+      let {
+        focusAnEvent,
+        resizeAnEvent,
+        clickHoldAnEvent,
+        dragAnEvent,
+        mousedown,
+        dragging
+      } = this.domEvents
 
       // On event resize end, emit event.
       if (resizeAnEvent.eventId) {
@@ -388,11 +401,16 @@ export default {
         clickHoldAnEvent.timeoutId = null
       }
 
-      // Any mouse up must cancel event resizing.
+      // Any mouse up must cancel event resizing and event dragging.
       resizeAnEvent.eventId = null
       resizeAnEvent.start = null
       resizeAnEvent.originalHeight = null
       resizeAnEvent.newHeight = null
+      dragAnEvent.eventId = null
+      dragAnEvent.start = null
+
+      this.domEvents.mousedown = false
+      this.domEvents.dragging = false
     },
 
     // Object of arrays of events indexed by dates.
