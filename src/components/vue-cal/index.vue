@@ -86,6 +86,10 @@ export default {
       type: Boolean,
       default: false
     },
+    cellCount: {
+      type: Number,
+      default: 42
+    },
     hideWeekends: {
       type: Boolean,
       default: false
@@ -777,7 +781,7 @@ export default {
           }
 
           // Create 42 cells (6 rows x 7 days) and populate them with days.
-          cells = Array.apply(null, Array(42)).map((cell, i) => {
+          cells = Array.apply(null, Array(parseInt(this.cellCount))).map((cell, i) => {
             const cellDate = days[i] || new Date(year, month + 1, ++nextMonthDays)
             // To increase performance skip checking isToday if today already found.
             const isToday = !todayFound && cellDate && cellDate.getDate() === this.now.getDate() &&
